@@ -120,6 +120,8 @@ Find all AI context files on the current machine and see which ones are tracked:
 
 ```bash
 ck scan ~/Projects
+ck scan ~/Projects --depth 3
+ck scan "C:\Users\Rob" --depth 2    # Windows paths auto-convert in WSL
 ```
 
 This finds `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `.cursorrules`, `CONVENTIONS.md`, etc.
