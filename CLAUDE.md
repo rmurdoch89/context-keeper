@@ -24,8 +24,10 @@ src/context_keeper/
 
 1. User edits `~/Projects/<project>/AGENTS.md` on Linux.
 2. `ck push <project>` uploads it to `Context/<project>/AGENTS.md` in Markless.
-3. On Windows, `ck pull <project>` downloads it before a Claude Code session.
+3. On Windows, `ck pull <project>` downloads it to the configured `local` path — ideally the actual project root.
 4. Both agents now read the same context.
+
+The `files` list in config controls which files are synced. Add `.cursorrules`, `CONVENTIONS.md`, or any other agent context file as needed.
 
 ## Configuration
 

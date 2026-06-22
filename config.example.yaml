@@ -1,5 +1,16 @@
 # Context Keeper configuration
 # Copy to ~/.config/context-keeper/config.yaml and edit.
+#
+# The "files" list can be any filenames your AI agents use. Common ones:
+#   AGENTS.md        -> Kimi Code
+#   CLAUDE.md        -> Claude Code
+#   .cursorrules     -> Cursor
+#   CONVENTIONS.md   -> Aider / generic
+#   CONTEXT.md       -> your own project brief
+#
+# The "local" path should be the actual project root on THIS device.
+# It can differ per device — e.g. ~/Projects/barnos on Linux and
+# C:\Users\Rob\barnos on Windows. Markless is the shared source of truth.
 
 markless:
   url: https://markless.rumbo.dev
