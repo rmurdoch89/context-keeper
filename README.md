@@ -69,6 +69,12 @@ ck generate barnos --write --push
 
 # Launch interactive TUI
 ck tui
+
+# Scan for context files on this machine
+ck scan ~/Projects
+
+# Show local vs remote diff
+ck diff barnos
 ```
 
 ## Cross-device workflow
@@ -107,6 +113,24 @@ Run `ck tui` for a terminal UI that shows all projects, their sync status, and l
 - `g` — generate CONTEXT.md
 - `r` — refresh status
 - `q` — quit
+
+## Scanning for context files
+
+Find all AI context files on the current machine and see which ones are tracked:
+
+```bash
+ck scan ~/Projects
+```
+
+This finds `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `.cursorrules`, `CONVENTIONS.md`, etc.
+
+## Diff local vs remote
+
+Before syncing, see what changed:
+
+```bash
+ck diff barnos
+```
 
 ## Adding a new AI agent
 

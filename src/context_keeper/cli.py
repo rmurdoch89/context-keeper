@@ -12,8 +12,10 @@ from rich.table import Table
 
 from . import __version__
 from .config import Config, ensure_dirs, get_project, list_projects, load_config
+from .diff import diff_project
 from .generate import generate_context
 from .markless import MarklessClient
+from .scan import scan_directory
 from .sync import get_status, pull as pull_files, push as push_files, sync as sync_files
 from .tui import run_tui
 
@@ -240,6 +242,66 @@ def generate(
         console.print(
             f"[green]Pushed CONTEXT.md to {project_cfg.remote.book}/{project_cfg.remote.section}[/green]"
         )
+
+
+@app.command()
+def scan(
+    path: Optional[Path] = typer.Argument(
+        None, help="Directory to scan (default: current directory)"
+    ),
+    config_path: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to config file"
+    ),
+):
+    """Scan for AI context files on this machine."""
+    target = path or Path.cwd()
+    if not target.exists():
+        console.print(f"[red]Path not found: {target}[/red]")
+        raise typer.Exit(1)
+
+    config = None
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        pass
+
+    results = scan_directory(target, config=config)
+    if not results:
+        console.print(f"[yellow]No context files found under {target}[/yellow]")
+        raise typer.Exit(0)
+
+    table = Table("File", "Path", "Status")
+    for r in results:
+        table.add_row(r["name"], str(r["path"]), r["status"])
+    console.print(table)
+    console.print(f"[dim]{len(results)} context file(s) found[/dim]")
+
+
+@app.command()
+def diff(
+    project: str = typer.Argument(..., help="Project name"),
+    config_path: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to config file"
+    ),
+):
+    """Show differences between local and remote context files."""
+    config = load_config(config_path)
+    project_cfg = get_project(config, project)
+
+    with _load_client(config) as client:
+        results = diff_project(client, project, project_cfg)
+
+    for r in results:
+        console.print(f"[bold]{r['file']}[/bold]")
+        if not r["local_exists"]:
+            console.print("  [magenta]missing locally[/magenta]")
+        elif not r["remote_exists"]:
+            console.print("  [cyan]missing remotely[/cyan]")
+        elif r["diff"]:
+            console.print(Markdown(f"```diff\n{r['diff']}\n```"))
+        else:
+            console.print("  [green]no differences[/green]")
+        console.print()
 
 
 @app.command()
