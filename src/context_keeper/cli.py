@@ -35,6 +35,17 @@ def _load_client(config: Config) -> MarklessClient:
     )
 
 
+def _normalize_path(path: Path) -> Path:
+    """Convert Windows paths to WSL paths when running under WSL."""
+    s = str(path).replace("\\\\", "\\")
+    if len(s) >= 2 and s[1] == ":":
+        # C:\foo -> /mnt/c/foo
+        drive = s[0].lower()
+        rest = s[2:].replace("\\", "/")
+        return Path(f"/mnt/{drive}{rest}")
+    return path
+
+
 @app.command()
 def list(
     config_path: Optional[Path] = typer.Option(
@@ -254,7 +265,7 @@ def scan(
     ),
 ):
     """Scan for AI context files on this machine."""
-    target = path or Path.cwd()
+    target = _normalize_path(path or Path.cwd())
     if not target.exists():
         console.print(f"[red]Path not found: {target}[/red]")
         raise typer.Exit(1)
