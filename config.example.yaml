@@ -1,0 +1,40 @@
+# Context Keeper configuration
+# Copy to ~/.config/context-keeper/config.yaml and edit.
+
+markless:
+  url: https://markless.rumbo.dev
+  username: rob
+  password: "6318Xeon"  # or set MARKLESS_PASSWORD env var
+
+projects:
+  barnos:
+    local: ~/Projects/barnos
+    remote:
+      book: Context
+      section: barnos
+    files:
+      - AGENTS.md
+      - CLAUDE.md
+      - CONTEXT.md
+
+  os-agent:
+    local: ~/Projects/os-agent
+    remote:
+      book: Context
+      section: os-agent
+    files:
+      - AGENTS.md
+      - CLAUDE.md
+
+  rumbo-web:
+    local: ~/Projects/rumbo-web
+    remote:
+      book: Context
+      section: rumbo-web
+    files:
+      - AGENTS.md
+      - CLAUDE.md
+
+# Optional: override backup/state directories
+# backup_dir: ~/.local/share/context-keeper/backups
+# state_dir: ~/.local/share/context-keeper/state

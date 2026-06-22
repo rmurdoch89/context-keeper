@@ -1,0 +1,22 @@
+[project]
+name = "context-keeper"
+version = "0.1.0"
+description = "Sync AI context files across devices via Markless"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.13.4",
+    "pyyaml>=6.0.3",
+    "rich>=15.0.0",
+    "typer>=0.26.7",
+]
+
+[project.scripts]
+ck = "context_keeper.cli:entry"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.15.18",
+]
