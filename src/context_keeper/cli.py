@@ -260,6 +260,9 @@ def scan(
     path: Optional[Path] = typer.Argument(
         None, help="Directory to scan (default: current directory)"
     ),
+    depth: int = typer.Option(
+        4, "--depth", "-d", help="Maximum directory depth to scan"
+    ),
     config_path: Optional[Path] = typer.Option(
         None, "--config", "-c", help="Path to config file"
     ),
@@ -276,7 +279,7 @@ def scan(
     except FileNotFoundError:
         pass
 
-    results = scan_directory(target, config=config)
+    results = scan_directory(target, config=config, max_depth=depth)
     if not results:
         console.print(f"[yellow]No context files found under {target}[/yellow]")
         raise typer.Exit(0)

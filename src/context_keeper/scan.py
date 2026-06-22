@@ -43,7 +43,9 @@ def _is_ignored(path: Path, root: Path) -> bool:
     return False
 
 
-def scan_directory(path: Path, config: Config | None = None) -> list[dict[str, Any]]:
+def scan_directory(
+    path: Path, config: Config | None = None, max_depth: int | None = None
+) -> list[dict[str, Any]]:
     """Scan a directory for known context files."""
     results = []
     tracked_paths: dict[Path, tuple[str, str]] = {}
@@ -53,10 +55,22 @@ def scan_directory(path: Path, config: Config | None = None) -> list[dict[str, A
             for file_name in project.files:
                 tracked_paths[project.local / file_name] = (project_name, file_name)
 
-    for root, _dirs, files in os.walk(path):
+    start_depth = len(path.parts)
+
+    for root, dirs, files in os.walk(path):
         root_path = Path(root)
-        if _is_ignored(root_path, path):
+        current_depth = len(root_path.parts) - start_depth
+
+        if max_depth is not None and current_depth > max_depth:
+            dirs[:] = []
             continue
+
+        if _is_ignored(root_path, path):
+            dirs[:] = []
+            continue
+
+        # Prune ignored directories so we don't recurse into them
+        dirs[:] = [d for d in dirs if not _is_ignored(root_path / d, path)]
         for file_name in files:
             if file_name not in KNOWN_CONTEXT_FILES:
                 continue
