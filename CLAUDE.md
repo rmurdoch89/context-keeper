@@ -56,3 +56,4 @@ projects:
 - After a successful push, local file mtime is touched to match remote mtime so status shows `synced`.
 - Backups are stored in `~/.local/share/context-keeper/backups/`.
 - `ck generate` creates a `CONTEXT.md` from repo metadata; it does not overwrite unless `--write` is passed.
+- `ck tui` launches a Textual TUI for interactive sync.

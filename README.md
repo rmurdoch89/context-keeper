@@ -66,6 +66,9 @@ ck read barnos CLAUDE.md
 
 # Generate CONTEXT.md from repo metadata
 ck generate barnos --write --push
+
+# Launch interactive TUI
+ck tui
 ```
 
 ## Cross-device workflow
@@ -93,6 +96,17 @@ Or run directly via WSL:
 ```bash
 wsl -d Ubuntu-24.04 -u rob /home/rob/.local/bin/ck version
 ```
+
+## Interactive TUI
+
+Run `ck tui` for a terminal UI that shows all projects, their sync status, and lets you pull/push/sync/generate with keys:
+
+- `p` — pull selected project
+- `P` — push selected project
+- `s` — sync selected project
+- `g` — generate CONTEXT.md
+- `r` — refresh status
+- `q` — quit
 
 ## Adding a new AI agent
 

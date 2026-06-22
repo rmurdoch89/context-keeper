@@ -15,6 +15,7 @@ from .config import Config, ensure_dirs, get_project, list_projects, load_config
 from .generate import generate_context
 from .markless import MarklessClient
 from .sync import get_status, pull as pull_files, push as push_files, sync as sync_files
+from .tui import run_tui
 
 app = typer.Typer(
     name="ck",
@@ -239,6 +240,16 @@ def generate(
         console.print(
             f"[green]Pushed CONTEXT.md to {project_cfg.remote.book}/{project_cfg.remote.section}[/green]"
         )
+
+
+@app.command()
+def tui(
+    config_path: Optional[Path] = typer.Option(
+        None, "--config", "-c", help="Path to config file"
+    ),
+):
+    """Launch the interactive TUI."""
+    run_tui(config_path=config_path)
 
 
 @app.command()

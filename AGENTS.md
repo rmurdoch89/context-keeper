@@ -23,6 +23,7 @@ uv run ck pull <project>
 uv run ck push <project>
 uv run ck sync <project>
 uv run ck generate <project> --write --push
+uv run ck tui
 
 # Lint/format
 uv run ruff check src/
