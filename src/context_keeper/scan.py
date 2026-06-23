@@ -19,27 +19,53 @@ KNOWN_CONTEXT_FILES = {
     ".github/copilot-instructions.md",
 }
 
+FILE_TOOLS: dict[str, str] = {
+    "AGENTS.md": "Kimi Code, OpenCode",
+    "CLAUDE.md": "Claude Code",
+    "CONTEXT.md": "project brief",
+    "CONVENTIONS.md": "Aider / generic",
+    ".cursorrules": "Cursor",
+    ".aider.conf.yml": "Aider",
+    ".github/copilot-instructions.md": "GitHub Copilot",
+}
+
+
+def tool_for(filename: str) -> str:
+    """Return the tool name for a given context filename."""
+    return FILE_TOOLS.get(filename, "")
+
+
+IGNORED_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    ".buildozer",
+    "bin",
+    "obj",
+    ".next",
+}
+
 
 def _is_ignored(path: Path, root: Path) -> bool:
-    """Check if path is inside common ignored directories."""
-    ignored = {
-        ".git",
-        ".venv",
-        "venv",
-        "node_modules",
-        "__pycache__",
-        ".pytest_cache",
-        ".ruff_cache",
-        "dist",
-        "build",
-        ".buildozer",
-        "bin",
-        "obj",
-        ".next",
-    }
+    """Check if path is inside a known-ignored directory."""
     for part in path.relative_to(root).parts:
-        if part in ignored or part.startswith("."):
+        if part in IGNORED_DIRS:
             return True
+    return False
+
+
+def _should_prune_dir(name: str) -> bool:
+    """Check if a directory should be pruned from traversal."""
+    if name in IGNORED_DIRS:
+        return True
+    if name.startswith(".") and name != ".github":
+        return True
     return False
 
 
@@ -52,8 +78,8 @@ def scan_directory(
 
     if config:
         for project_name, project in config.projects.items():
-            for file_name in project.files:
-                tracked_paths[project.local / file_name] = (project_name, file_name)
+            for file_name in project.resolve_files():
+                tracked_paths[project.file_path(file_name)] = (project_name, file_name)
 
     start_depth = len(path.parts)
 
@@ -69,12 +95,15 @@ def scan_directory(
             dirs[:] = []
             continue
 
-        # Prune ignored directories so we don't recurse into them
-        dirs[:] = [d for d in dirs if not _is_ignored(root_path / d, path)]
+        dirs[:] = [d for d in dirs if not _should_prune_dir(d)]
         for file_name in files:
-            if file_name not in KNOWN_CONTEXT_FILES:
-                continue
             file_path = root_path / file_name
+            rel_path = str(file_path.relative_to(path))
+            if (
+                file_name not in KNOWN_CONTEXT_FILES
+                and rel_path not in KNOWN_CONTEXT_FILES
+            ):
+                continue
             if _is_ignored(file_path, path):
                 continue
             if file_path in tracked_paths:

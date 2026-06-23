@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,6 +10,8 @@ from typing import Any
 
 from .config import Config, ProjectConfig
 from .markless import MarklessClient
+
+MTIME_TOLERANCE_S = 2
 
 
 class FileStatus:
@@ -44,8 +47,10 @@ class FileStatus:
             return False
         if self.local_mtime is None or self.remote_mtime is None:
             return False
-        # Allow 2-second tolerance for filesystem differences
-        return abs((self.local_mtime - self.remote_mtime).total_seconds()) < 2
+        return (
+            abs((self.local_mtime - self.remote_mtime).total_seconds())
+            < MTIME_TOLERANCE_S
+        )
 
     @property
     def local_newer(self) -> bool:
@@ -53,7 +58,9 @@ class FileStatus:
             return False
         if self.local_mtime is None or self.remote_mtime is None:
             return False
-        return self.local_mtime > self.remote_mtime
+        return (
+            self.local_mtime - self.remote_mtime
+        ).total_seconds() >= MTIME_TOLERANCE_S
 
     @property
     def remote_newer(self) -> bool:
@@ -61,7 +68,9 @@ class FileStatus:
             return False
         if self.local_mtime is None or self.remote_mtime is None:
             return False
-        return self.remote_mtime > self.local_mtime
+        return (
+            self.remote_mtime - self.local_mtime
+        ).total_seconds() >= MTIME_TOLERANCE_S
 
     def __repr__(self) -> str:
         return f"<FileStatus {self.name}: local={self.local_exists} remote={self.remote_exists}>"
@@ -78,9 +87,10 @@ def _backup(
     if not path.exists():
         return None
     ts = _utc_now().strftime("%Y%m%d-%H%M%S")
-    backup_dir = config.backup_dir / project_name / file_name / ts
+    safe_name = file_name.replace("/", "_").replace("\\", "_")
+    backup_dir = config.backup_dir / project_name / safe_name / ts
     backup_dir.mkdir(parents=True, exist_ok=True)
-    dest = backup_dir / file_name
+    dest = backup_dir / path.name
     shutil.copy2(path, dest)
     return dest
 
@@ -94,10 +104,30 @@ def _local_mtime(path: Path) -> datetime | None:
 
 def _touch_mtime(path: Path, mtime: datetime) -> None:
     """Set file mtime to match remote."""
-    import os
-
     ts = mtime.timestamp()
     os.utime(path, (ts, ts))
+
+
+def _mirror(project: ProjectConfig, file_name: str) -> None:
+    """Copy a pulled file to the mirror directory if configured."""
+    if not project.mirror:
+        return
+    src = project.file_path(file_name)
+    if not src.exists():
+        return
+    if project.dir is not None:
+        dst = project.mirror / file_name.replace("_", "/")
+    else:
+        dst = project.mirror / file_name
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+
+
+def _local_path(project: ProjectConfig, file_name: str) -> Path:
+    """Resolve a file name to its local path, handling dir-based projects."""
+    if project.dir is not None:
+        return project.local / file_name.replace("_", "/")
+    return project.local / file_name
 
 
 def get_status(
@@ -107,8 +137,8 @@ def get_status(
 ) -> list[FileStatus]:
     """Compare local and remote files for a project."""
     statuses = []
-    for file_name in project.files:
-        local_path = project.local / file_name
+    for file_name in project.resolve_files():
+        local_path = project.file_path(file_name)
         local_exists = local_path.exists()
         local_mtime = _local_mtime(local_path) if local_exists else None
         remote_mtime = client.file_modified_at(
@@ -171,6 +201,7 @@ def pull(
         status.local_path.write_text(content, encoding="utf-8")
         if status.remote_mtime:
             _touch_mtime(status.local_path, status.remote_mtime)
+        _mirror(project, status.name)
 
         actions.append(
             {
@@ -214,9 +245,6 @@ def push(
                 }
             )
             continue
-
-        # Backup local before push
-        _backup(config, project_name, status.name, status.local_path)
 
         content = status.local_path.read_text(encoding="utf-8")
         client.write_file(
@@ -267,7 +295,6 @@ def sync(
                 )
                 continue
             # Push local to remote
-            _backup(config, project_name, status.name, status.local_path)
             content = status.local_path.read_text(encoding="utf-8")
             client.write_file(
                 project.remote.book, project.remote.section, status.name, content
@@ -304,6 +331,7 @@ def sync(
             status.local_path.write_text(content, encoding="utf-8")
             if status.remote_mtime:
                 _touch_mtime(status.local_path, status.remote_mtime)
+            _mirror(project, status.name)
             actions.append(
                 {
                     "file": status.name,
@@ -333,4 +361,23 @@ def sync(
                 }
             )
 
+    return actions
+
+
+def delete_files(
+    client: MarklessClient,
+    config: Config,
+    project_name: str,
+    project: ProjectConfig,
+    files: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Delete files from Markless. If files is None, deletes all remote files."""
+    actions = []
+    remote = client.list_files(book=project.remote.book, section=project.remote.section)
+    for f in remote:
+        name = f["name"]
+        if files is not None and name.lower() not in {x.lower() for x in files}:
+            continue
+        client.delete_file(project.remote.book, project.remote.section, name)
+        actions.append({"file": name, "action": "deleted"})
     return actions
