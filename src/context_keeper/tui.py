@@ -9,9 +9,12 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
+from textual.screen import ModalScreen
 from textual.widgets import (
+    Button,
     Footer,
     Header,
+    Input,
     Label,
     ListItem,
     ListView,
@@ -20,11 +23,85 @@ from textual.widgets import (
 )
 from textual import work
 
+import httpx
+
 from .config import Config, ProjectConfig, ensure_dirs, list_projects, load_config
 from .generate import generate_context
 from .markless import MarklessClient
 from .scan import tool_for
 from .sync import get_status, pull as pull_files, push as push_files, sync as sync_files
+
+
+class CredentialsScreen(ModalScreen[tuple[str, str] | None]):
+    """Modal screen to prompt for Markless credentials inside the TUI."""
+
+    DEFAULT_CSS = """
+    CredentialsScreen {
+        align: center middle;
+    }
+    #credentials-dialog {
+        width: 60;
+        height: auto;
+        border: thick $background 80%;
+        padding: 1 2;
+    }
+    #credentials-dialog Input {
+        margin: 1 0;
+    }
+    #credentials-dialog Button {
+        margin-right: 1;
+    }
+    #credentials-error {
+        color: $error;
+        height: auto;
+        margin-top: 1;
+    }
+    """
+
+    def __init__(self, url: str, username: str = "", title: str = "Sign in") -> None:
+        super().__init__()
+        self.url = url
+        self.username = username
+        self.title_text = title
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="credentials-dialog"):
+            yield Static(f"{self.title_text} to {self.url}", id="title")
+            yield Input(
+                value=self.username,
+                placeholder="Username",
+                id="username",
+            )
+            yield Input(
+                placeholder="Password",
+                id="password",
+                password=True,
+            )
+            with Horizontal():
+                yield Button("Sign in", variant="primary", id="signin")
+                yield Button("Quit", id="quit")
+            yield Static("", id="credentials-error")
+
+    def on_mount(self) -> None:
+        self.query_one("#username", Input).focus()
+
+    def _submit(self) -> None:
+        username = self.query_one("#username", Input).value.strip()
+        password = self.query_one("#password", Input).value.strip()
+        error = self.query_one("#credentials-error", Static)
+        if not username or not password:
+            error.update("Username and password are required.")
+            return
+        self.dismiss((username, password))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "signin":
+            self._submit()
+        else:
+            self.dismiss(None)
+
+    def on_input_submitted(self) -> None:
+        self._submit()
 
 
 class ProjectListItem(ListItem):
@@ -151,10 +228,9 @@ class ContextKeeperApp(App[None]):
         ("q", "quit", "Quit"),
     ]
 
-    def __init__(self, config_path: Path | None = None) -> None:
+    def __init__(self, config: Config) -> None:
         super().__init__()
-        self.config_path = config_path
-        self.config: Config | None = None
+        self.config = config
         self.client: MarklessClient | None = None
         self.projects: dict[str, ProjectConfig] = {}
         self.project_states: dict[str, list[dict[str, Any]]] = {}
@@ -169,14 +245,53 @@ class ContextKeeperApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.config = load_config(self.config_path)
         ensure_dirs(self.config)
+        self.projects = self.config.projects
+        if not self.config.markless.username or not self.config.markless.password:
+            self.push_screen(
+                CredentialsScreen(
+                    url=self.config.markless.url,
+                    username=self.config.markless.username,
+                ),
+                callback=self._on_credentials,
+            )
+        else:
+            self._connect_and_load(retry=False)
+
+    def _on_credentials(self, result: tuple[str, str] | None) -> None:
+        """Handle credentials supplied from the modal screen."""
+        if result is None:
+            self.exit()
+            return
+        username, password = result
+        self.config.markless.username = username
+        self.config.markless.password = password
+        self._connect_and_load(retry=True)
+
+    def _connect_and_load(self, retry: bool = False) -> None:
+        """Create the API client, validate credentials, and load projects."""
         self.client = MarklessClient(
             url=self.config.markless.url,
             username=self.config.markless.username,
             password=self.config.markless.password,
         )
-        self.projects = self.config.projects
+
+        try:
+            # Quick auth check; 401 means bad/missing credentials.
+            self.client.tree()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401:
+                self.push_screen(
+                    CredentialsScreen(
+                        url=self.config.markless.url,
+                        username=self.config.markless.username,
+                        title="Authentication failed" if retry else "Sign in",
+                    ),
+                    callback=self._on_credentials,
+                )
+                return
+            raise
+
         self.refresh_projects()
 
     def refresh_projects(self) -> None:
@@ -423,5 +538,8 @@ class ContextKeeperApp(App[None]):
 
 
 def run_tui(config_path: Path | None = None) -> None:
-    app = ContextKeeperApp(config_path=config_path)
+    # Load config without terminal prompting; the TUI will ask for missing
+    # credentials via CredentialsScreen.
+    config = load_config(config_path, prompt=False)
+    app = ContextKeeperApp(config)
     app.run()

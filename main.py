@@ -1,6 +1,4 @@
-def main():
-    print("Hello from context-keeper!")
-
+from context_keeper.cli import entry
 
 if __name__ == "__main__":
-    main()
+    entry()

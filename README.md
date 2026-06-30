@@ -8,7 +8,7 @@ context-keeper syncs whatever markdown files your AI agents read. Common ones:
 
 | File | Used by |
 |------|---------|
-| `AGENTS.md` | Kimi Code |
+| `AGENTS.md` | Kimi Code, OpenCode |
 | `CLAUDE.md` | Claude Code |
 | `.cursorrules` | Cursor |
 | `CONVENTIONS.md` | Aider, generic |
@@ -75,6 +75,9 @@ ck scan ~/Projects
 
 # Show local vs remote diff
 ck diff barnos
+
+# Clone a context file to other filenames
+ck clone barnos AGENTS.md CLAUDE.md CONVENTIONS.md --push
 ```
 
 ## Cross-device workflow
@@ -111,6 +114,7 @@ Run `ck tui` for a terminal UI that shows all projects, their sync status, and l
 - `P` — push selected project
 - `s` — sync selected project
 - `g` — generate CONTEXT.md
+- `c` — clone an existing file to fill in missing ones
 - `r` — refresh status
 - `q` — quit
 

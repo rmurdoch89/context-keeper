@@ -13,9 +13,9 @@
 # C:\Users\Rob\barnos on Windows. Markless is the shared source of truth.
 
 markless:
-  url: https://markless.rumbo.dev
-  username: rob
-  password: "6318Xeon"  # or set MARKLESS_PASSWORD env var
+  url: https://your-markless-instance.example.com
+  username: your-username
+  password: "your-password"  # or set MARKLESS_PASSWORD env var
 
 projects:
   barnos:

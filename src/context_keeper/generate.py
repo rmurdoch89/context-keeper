@@ -48,9 +48,25 @@ def _git_branch(cwd: Path) -> str:
 def _find_todos(cwd: Path, limit: int = MAX_TODOS) -> list[str]:
     """Find TODO/FIXME/HACK comments in code files."""
     todos = []
-    pattern = re.compile(r"#\s*(TODO|FIXME|HACK|XXX)\s*:?\s*(.+)", re.IGNORECASE)
-    # Common code file extensions; skip node_modules, .venv, etc.
-    for ext in (".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java", ".md"):
+    comment_patterns = [
+        re.compile(r"#\s*(TODO|FIXME|HACK|XXX)\s*:?\s*(.+)", re.IGNORECASE),
+        re.compile(r"//\s*(TODO|FIXME|HACK|XXX)\s*:?\s*(.+)", re.IGNORECASE),
+    ]
+    for ext in (
+        ".py",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".go",
+        ".rs",
+        ".java",
+        ".md",
+        ".cpp",
+        ".c",
+        ".h",
+        ".css",
+    ):
         for path in cwd.rglob(f"*{ext}"):
             if any(
                 part.startswith(
@@ -70,30 +86,36 @@ def _find_todos(cwd: Path, limit: int = MAX_TODOS) -> list[str]:
             try:
                 with open(path, "r", encoding="utf-8", errors="ignore") as f:
                     for i, line in enumerate(f, 1):
-                        match = pattern.search(line)
-                        if match:
-                            rel = path.relative_to(cwd)
-                            todos.append(
-                                f"- [{rel}:{i}] {match.group(1).upper()}: {match.group(2).strip()}"
-                            )
-                            if len(todos) >= limit:
-                                return todos
+                        for pattern in comment_patterns:
+                            match = pattern.search(line)
+                            if match:
+                                rel = path.relative_to(cwd)
+                                todos.append(
+                                    f"- [{rel}:{i}] {match.group(1).upper()}: {match.group(2).strip()}"
+                                )
+                                if len(todos) >= limit:
+                                    return todos
+                                break
             except Exception:
                 continue
     return todos
 
 
-def _find_files(cwd: Path, name: str) -> list[Path]:
-    """Find a file in root and immediate subdirectories."""
+def _find_files(cwd: Path, name: str, max_depth: int = 3) -> list[Path]:
+    """Find a file in root and subdirectories up to max_depth."""
     found = []
-    root = cwd / name
-    if root.exists():
-        found.append(root)
-    for subdir in cwd.iterdir():
-        if subdir.is_dir() and not subdir.name.startswith("."):
-            candidate = subdir / name
-            if candidate.exists():
-                found.append(candidate)
+    for path in cwd.rglob(name):
+        rel = path.relative_to(cwd)
+        if len(rel.parts) - 1 > max_depth:
+            continue
+        if any(
+            part.startswith(
+                (".", "node_modules", "venv", ".venv", "__pycache__", "dist", "build")
+            )
+            for part in path.parts
+        ):
+            continue
+        found.append(path)
     return found
 
 
@@ -346,7 +368,7 @@ def generate_context(project_name: str, cwd: Path) -> str:
         [
             "## Notes",
             "",
-            "_Add manual notes here. They will be preserved across syncs._",
+            "_Add manual notes here._",
             "",
         ]
     )

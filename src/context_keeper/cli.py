@@ -60,7 +60,7 @@ def _normalize_path(path: Path) -> Path:
 
 
 @app.command(name="list")
-def list_projects(
+def list_projects_cmd(
     config_path: Path | None = typer.Option(
         None, "--config", "-c", help="Path to config file"
     ),

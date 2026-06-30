@@ -134,4 +134,4 @@ ck diff barnos
 
 ## Notes
 
-_Add manual notes here. They will be preserved across syncs._
+_Add manual notes here._
