@@ -135,16 +135,47 @@ def get_status(
     project_name: str,
     project: ProjectConfig,
 ) -> list[FileStatus]:
-    """Compare local and remote files for a project."""
+    """Compare local and remote files for a project.
+
+    Filenames are matched case-insensitively so that cross-platform sync
+    (e.g. Windows vs Linux) does not show spurious conflicts for files that
+    differ only in case.
+    """
+    local_files = {name: project.file_path(name) for name in project.resolve_files()}
+    remote_files = {
+        f["name"]: f
+        for f in client.list_files(
+            book=project.remote.book, section=project.remote.section
+        )
+    }
+
+    # Build case-insensitive index. Prefer the local filename as the canonical
+    # name so the displayed name matches the local filesystem.
+    canonical: dict[str, str] = {}
+    for name in local_files:
+        canonical[name.lower()] = name
+    for name in remote_files:
+        canonical.setdefault(name.lower(), name)
+
     statuses = []
-    for file_name in project.resolve_files():
-        local_path = project.file_path(file_name)
+    for key in sorted(canonical):
+        file_name = canonical[key]
+        local_path = local_files.get(file_name)
+        if local_path is None:
+            local_path = project.file_path(file_name)
         local_exists = local_path.exists()
         local_mtime = _local_mtime(local_path) if local_exists else None
-        remote_mtime = client.file_modified_at(
-            project.remote.book, project.remote.section, file_name
-        )
-        remote_exists = remote_mtime is not None
+
+        remote_info = remote_files.get(file_name)
+        if remote_info is None:
+            # Fall back to case-insensitive remote lookup.
+            remote_info = remote_files.get(key)
+        if remote_info is not None:
+            remote_mtime = datetime.fromisoformat(remote_info["modifiedAt"])
+            remote_exists = True
+        else:
+            remote_mtime = None
+            remote_exists = False
 
         statuses.append(
             FileStatus(
@@ -198,6 +229,7 @@ def pull(
         content = client.read_file(
             project.remote.book, project.remote.section, status.name
         )
+        status.local_path.parent.mkdir(parents=True, exist_ok=True)
         status.local_path.write_text(content, encoding="utf-8")
         if status.remote_mtime:
             _touch_mtime(status.local_path, status.remote_mtime)
@@ -328,6 +360,7 @@ def sync(
             content = client.read_file(
                 project.remote.book, project.remote.section, status.name
             )
+            status.local_path.parent.mkdir(parents=True, exist_ok=True)
             status.local_path.write_text(content, encoding="utf-8")
             if status.remote_mtime:
                 _touch_mtime(status.local_path, status.remote_mtime)
