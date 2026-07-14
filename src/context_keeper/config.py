@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import getpass
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,25 @@ from pydantic import BaseModel, Field, field_validator
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "context-keeper" / "config.yaml"
 DEFAULT_BACKUP_DIR = Path.home() / ".local" / "share" / "context-keeper" / "backups"
 DEFAULT_STATE_DIR = Path.home() / ".local" / "share" / "context-keeper" / "state"
+
+_SEGMENT_SPLIT_RE = re.compile(r"(?<!_)_(?!_)")
+
+
+def flatten_rel_path(rel_posix: str) -> str:
+    """Encode a relative posix path into a flat name safe for Markless.
+
+    Markless does not support "/" in filenames, so dir-mode projects join
+    path segments with "_". A literal "_" already present in a segment is
+    escaped as "__" so a lone "_" unambiguously marks the original "/" —
+    without this, a filename containing "_" would be mis-split on unflatten.
+    """
+    return "_".join(part.replace("_", "__") for part in rel_posix.split("/"))
+
+
+def unflatten_name(name: str) -> str:
+    """Reverse of flatten_rel_path."""
+    parts = _SEGMENT_SPLIT_RE.split(name)
+    return "/".join(part.replace("__", "_") for part in parts)
 
 
 class MarklessConfig(BaseModel):
@@ -59,14 +79,14 @@ class ProjectConfig(BaseModel):
                 if any(part.startswith(".") for part in parts):
                     continue
                 rel = str(p.relative_to(scan_root).as_posix())
-                md_files.append(rel.replace("/", "_"))
+                md_files.append(flatten_rel_path(rel))
             return md_files
         return list(self.files)
 
     def file_path(self, name: str) -> Path:
         """Resolve a file name to its local path."""
         if self.dir is not None:
-            return self.local / name.replace("_", "/")
+            return self.local / unflatten_name(name)
         return self.local / name
 
 

@@ -12,7 +12,15 @@ from rich.markdown import Markdown
 from rich.table import Table
 
 from . import __version__
-from .config import Config, ensure_dirs, get_project, list_projects, load_config
+from .config import (
+    Config,
+    ensure_dirs,
+    flatten_rel_path,
+    get_project,
+    list_projects,
+    load_config,
+    unflatten_name,
+)
 from .diff import diff_project
 from .generate import generate_context
 from .markless import MarklessClient
@@ -529,9 +537,7 @@ def history(
         safe_name, ts = parts[0], parts[1]
         backup_dir = backup_root / safe_name / ts
         backup_file = backup_dir / Path(file or "").name
-        dest = project_cfg.file_path(
-            safe_name.replace("_", "/") + ".md" if project_cfg.dir else (file or "")
-        )
+        dest = project_cfg.file_path(safe_name if project_cfg.dir else (file or ""))
         if not backup_file.exists():
             console.print(f"[red]Backup not found: {backup_file}[/red]")
             raise typer.Exit(1)
@@ -540,7 +546,7 @@ def history(
         return
 
     if file:
-        safe_name = file.replace("/", "_")
+        safe_name = flatten_rel_path(file) if project_cfg.dir else file
         backup_dirs = (
             sorted((backup_root / safe_name).iterdir(), reverse=True)
             if (backup_root / safe_name).exists()
@@ -631,11 +637,8 @@ def skills(
                 "_skill.md"
             ):
                 continue
-            skill_name = (
-                file_name.replace("_SKILL.md", "")
-                .replace("_skill.md", "")
-                .replace("_", "/")
-            )
+            rel_path = unflatten_name(file_name)
+            skill_name = rel_path.removesuffix("/SKILL.md").removesuffix("/skill.md")
             table.add_row(skill_name, file_name, "OpenCode, Claude Code")
     console.print(table)
 

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .config import Config, ProjectConfig
+from .config import Config, ProjectConfig, unflatten_name
 from .markless import MarklessClient
 
 MTIME_TOLERANCE_S = 2
@@ -116,18 +116,11 @@ def _mirror(project: ProjectConfig, file_name: str) -> None:
     if not src.exists():
         return
     if project.dir is not None:
-        dst = project.mirror / file_name.replace("_", "/")
+        dst = project.mirror / unflatten_name(file_name)
     else:
         dst = project.mirror / file_name
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
-
-
-def _local_path(project: ProjectConfig, file_name: str) -> Path:
-    """Resolve a file name to its local path, handling dir-based projects."""
-    if project.dir is not None:
-        return project.local / file_name.replace("_", "/")
-    return project.local / file_name
 
 
 def get_status(
